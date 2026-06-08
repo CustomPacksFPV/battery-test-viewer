@@ -639,11 +639,19 @@ else:
         chart_title = f"{pack_title} — {graph_type} + {graph_type_2}"
 
     layout_kwargs = dict(
+        legend=dict(
+    orientation="h",
+    yanchor="bottom",
+    y=1.10,
+    xanchor="left",
+    x=0,
+    font=dict(size=16)
+),
         title=chart_title,
         height=int(chart_height),
         template="plotly_white",
         hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.12, xanchor="left", x=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.18, xanchor="left", x=0),
         margin=dict(l=70, r=70 if graph_type_2 != "None" else 30, t=90, b=70),
         xaxis=dict(title="Elapsed time (minutes)", showgrid=True),
         yaxis=dict(title=y_titles.get(graph_type, graph_type), showgrid=True),
