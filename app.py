@@ -29,17 +29,20 @@ PACK_INFO_FILE = DATA_DIR / "pack_info.csv"
 
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 st.title(APP_TITLE)
+st.caption("Verified discharge test results for available battery packs.")
 
-col1, col2 = st.columns([4, 1])
+with st.container():
+    st.markdown("""
+    <div style="
+        float:right;
+        width:320px;
+        margin-top:-70px;
+        margin-bottom:20px;
+    ">
+    """, unsafe_allow_html=True)
 
-with col1:
-    st.caption("Verified discharge test results for available battery packs.")
-
-with col2:
     with st.expander("About These Tests"):
         st.markdown("""
-**Test Notes**
-
 • Results are from individual sample packs and may vary slightly between packs.
 
 • Capacity, voltage sag and temperature depend on ambient temperature, cooling airflow and discharge profile.
@@ -50,6 +53,8 @@ with col2:
 
 • Cells are discharged to 2.5V per cell, or until the cell temperature limit.
 """)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # ----------------------------
 # CSV loader: supports your logger format + ATORCH exports
