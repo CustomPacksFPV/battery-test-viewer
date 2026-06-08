@@ -304,8 +304,16 @@ def metric_card_html(title: str, subtitle: str, metrics: list[tuple[str, str]], 
     for label, value in metrics:
         metric_blocks += (
             f'<div>'
-            f'<div style="font-size: 0.78rem; opacity: 0.72; font-weight: 600;">{html_escape(label)}</div>'
-            f'<div style="font-size: 1.65rem; line-height: 1.25; margin-top: 0.15rem;">{html_escape(value)}</div>'
+            f'<div style="font-size: 0.68rem; opacity: 0.72; font-weight: 650; line-height: 1.05;">{html_escape(label)}</div>'
+            f'<div style="font-size: 1.20rem; line-height: 1.08; margin-top: 0.05rem;">{html_escape(value)}</div>'
+            f'</div>'
+        )
+
+    subtitle_html = ""
+    if str(subtitle).strip():
+        subtitle_html = (
+            f'<div style="font-size: 0.72rem; opacity: 0.70; margin-bottom: 0.45rem; line-height: 1.05;">'
+            f'{html_escape(subtitle)}'
             f'</div>'
         )
 
@@ -314,19 +322,18 @@ def metric_card_html(title: str, subtitle: str, metrics: list[tuple[str, str]], 
         f'<div style="'
         f'border: 1px solid rgba(255,255,255,0.14); '
         f'border-left: 7px solid {color}; '
-        f'border-radius: 10px; '
-        f'padding: 18px 18px 16px 18px; '
-        f'margin: 0 0 14px 0; '
+        f'border-radius: 8px; '
+        f'padding: 9px 14px 9px 14px; '
+        f'margin: 0 0 8px 0; '
         f'background: linear-gradient(90deg, {color_to_rgba(color, 0.11)}, rgba(255,255,255,0.018) 34%);'
         f'">'
-        f'<div style="font-size: 1.15rem; font-weight: 750; margin-bottom: 0.35rem;">{html_escape(title)}</div>'
-        f'<div style="font-size: 0.82rem; opacity: 0.75; margin-bottom: 1.1rem;">{html_escape(subtitle)}</div>'
-        f'<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 1.15rem 2rem;">'
+        f'<div style="font-size: 0.95rem; font-weight: 750; margin-bottom: 0.35rem; line-height: 1.05;">{html_escape(title)}</div>'
+        f'{subtitle_html}'
+        f'<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.45rem 1.25rem;">'
         f'{metric_blocks}'
         f'</div>'
         f'</div>'
     )
-
 
 try:
     index_df = load_index()
@@ -623,10 +630,10 @@ else:
     y_titles = {
         "Voltage": "Voltage (V)",
         "Temperature": "Temperature (°C)",
-        "Power": "Power (W)",
+        "Watts": "Watts (W)",
         "Current": "Current (A)",
-        "Capacity": "Capacity (mAh)",
-        "Energy": "Energy (Wh)",
+        "mAh": "mAh",
+        "Wh": "Wh",
     }
 
     chart_title = f"{pack_title} — {graph_type}"
