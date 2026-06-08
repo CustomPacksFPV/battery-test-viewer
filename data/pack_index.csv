@@ -1,0 +1,5 @@
+pack,test,current_a,file
+JP30 6S1P,20A run,20,DMITRY jp30 6s1p 20A 59deg_temp_corrected_59C.csv
+JP30 6S1P,50A run,50,dmitry jp30 6s1p 50A 62deg_temp_corrected_62C.csv
+50XG 6S1P,20A run,20,Dmitry 5Ah 20A 61 degrees_temp_corrected_61C.csv
+50XG 6S1P,50A run,50,Dmitry 5Ah 50A 60 degrees_temp_corrected_60C.csv
