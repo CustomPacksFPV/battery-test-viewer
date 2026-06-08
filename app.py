@@ -30,14 +30,6 @@ st.set_page_config(page_title=APP_TITLE, layout="wide")
 st.title(APP_TITLE)
 st.caption("Verified discharge test results for available battery packs.")
 
-st.write("INDEX FILE:", INDEX_FILE)
-st.write("INDEX EXISTS:", INDEX_FILE.exists())
-st.write("DATA DIR EXISTS:", DATA_DIR.exists())
-
-if DATA_DIR.exists():
-    st.write("DATA FOLDER CONTENTS:")
-    st.write([p.name for p in DATA_DIR.iterdir()])
-
 # ----------------------------
 # CSV loader: supports your logger format + ATORCH exports
 # ----------------------------
