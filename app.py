@@ -378,10 +378,10 @@ with st.sidebar:
     graph_options = {
         "Voltage": "Voltage(V)",
         "Temperature": "Temperature(C)",
-        "Power": "Power(W)",
+        "Watts": "Power(W)",
         "Current": "Current(A)",
-        "Capacity": "mAh_calc",
-        "Energy": "Wh_calc",
+        "mAh": "mAh_calc",
+        "Wh": "Wh_calc",
     }
     graph_type = st.selectbox("Primary graph", list(graph_options.keys()))
 
