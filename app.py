@@ -25,6 +25,7 @@ from scipy.signal import savgol_filter
 APP_TITLE = "Battery Pack Test Results"
 DATA_DIR = Path("data")
 INDEX_FILE = DATA_DIR / "pack_index.csv"
+PACK_INFO_FILE = DATA_DIR / "pack_info.csv"
 
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 st.title(APP_TITLE)
@@ -191,6 +192,17 @@ def load_index() -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def load_pack_info() -> pd.DataFrame:
+    """Load optional pack/cell specification data from data/pack_info.csv."""
+    if not PACK_INFO_FILE.exists():
+        return pd.DataFrame()
+    info = pd.read_csv(PACK_INFO_FILE)
+    if "pack" not in info.columns:
+        raise ValueError("pack_info.csv is missing required column: pack")
+    return info
+
+
+@st.cache_data(show_spinner=False)
 def load_test_file(relative_file: str) -> pd.DataFrame:
     path = Path(relative_file)
     if not path.is_absolute():
@@ -336,6 +348,54 @@ else:
 # Pack info
 # ----------------------------
 st.subheader(pack)
+
+# Optional customer-facing pack/cell specs from data/pack_info.csv.
+# Match rows by the "pack" column.
+try:
+    pack_info_df = load_pack_info()
+except Exception as e:
+    pack_info_df = pd.DataFrame()
+    st.warning(f"Could not load pack_info.csv: {e}")
+
+if not pack_info_df.empty:
+    info_rows = pack_info_df[pack_info_df["pack"].astype(str) == str(pack)]
+
+    if not info_rows.empty:
+        info = info_rows.iloc[0]
+
+        with st.container(border=True):
+            st.markdown("### Pack / Cell Specifications")
+
+            # Show compact metric boxes for short values, and full-width text for long notes.
+            hidden_cols = {"pack"}
+            long_text_cols = {"notes", "description", "summary", "datasheet_notes", "capabilities"}
+
+            metric_items = []
+            text_items = []
+
+            for col in pack_info_df.columns:
+                if col in hidden_cols:
+                    continue
+
+                value = info.get(col)
+                if pd.isna(value):
+                    continue
+
+                label = str(col).replace("_", " ").title()
+                value_text_display = str(value)
+
+                if col.lower() in long_text_cols or len(value_text_display) > 80:
+                    text_items.append((label, value_text_display))
+                else:
+                    metric_items.append((label, value_text_display))
+
+            if metric_items:
+                cols = st.columns(min(4, len(metric_items)))
+                for i, (label, value) in enumerate(metric_items):
+                    cols[i % len(cols)].metric(label, value)
+
+            for label, value in text_items:
+                st.markdown(f"**{label}:** {value}")
 
 meta_bits = []
 first_row = selected_rows.iloc[0]
