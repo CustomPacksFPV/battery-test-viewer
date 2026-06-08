@@ -286,12 +286,30 @@ JP30 6S1P,50A run,50,data/JP30_6S1P_50A.csv,Ampace JP30,High current test""",
 with st.sidebar:
     st.header("Select results")
 
-    packs = sorted(index_df["pack"].dropna().unique().tolist())
-    pack = st.selectbox("Battery pack", packs)
+    packs = sorted(index_df["pack"].dropna().astype(str).unique().tolist())
 
-    pack_rows = index_df[index_df["pack"] == pack].copy()
-    tests = pack_rows["test"].dropna().tolist()
-    selected_tests = st.multiselect("Tests", tests, default=tests[: min(3, len(tests))])
+    selected_packs = st.multiselect(
+        "Battery packs",
+        packs,
+        default=packs[:1],
+        help="Select one pack for normal viewing, or multiple packs to compare cells/packs on the same graph.",
+    )
+
+    if not selected_packs:
+        st.info("Select at least one battery pack.")
+        st.stop()
+
+    pack_rows = index_df[index_df["pack"].astype(str).isin(selected_packs)].copy()
+
+    # Use unique test names across the selected packs. This works well when each pack
+    # has matching test names like 20A run, 30A run, 50A run, etc.
+    tests = sorted(pack_rows["test"].dropna().astype(str).unique().tolist())
+    selected_tests = st.multiselect(
+        "Tests",
+        tests,
+        default=tests[: min(3, len(tests))],
+        help="When comparing packs, select the same current test, e.g. 20A run, to compare them directly.",
+    )
 
     graph_options = {
         "Voltage": "Voltage(V)",
@@ -315,7 +333,7 @@ if not selected_tests:
     st.info("Select at least one test.")
     st.stop()
 
-selected_rows = pack_rows[pack_rows["test"].isin(selected_tests)]
+selected_rows = pack_rows[pack_rows["test"].astype(str).isin(selected_tests)]
 
 # ----------------------------
 # Load selected tests
@@ -347,7 +365,8 @@ else:
 # ----------------------------
 # Pack info
 # ----------------------------
-st.subheader(pack)
+pack_title = selected_packs[0] if len(selected_packs) == 1 else "Pack comparison"
+st.subheader(pack_title)
 
 # Optional customer-facing pack/cell specs from data/pack_info.csv.
 # Match rows by the "pack" column.
@@ -358,52 +377,60 @@ except Exception as e:
     st.warning(f"Could not load pack_info.csv: {e}")
 
 if not pack_info_df.empty:
-    info_rows = pack_info_df[pack_info_df["pack"].astype(str) == str(pack)]
+    matching_info = pack_info_df[pack_info_df["pack"].astype(str).isin(selected_packs)].copy()
 
-    if not info_rows.empty:
-        info = info_rows.iloc[0]
+    if not matching_info.empty:
+        st.markdown("### Pack / Cell Specifications")
 
-        with st.container(border=True):
-            st.markdown("### Pack / Cell Specifications")
+        # Show one bordered spec box per selected pack so comparisons stay readable.
+        for _, info in matching_info.iterrows():
+            with st.container(border=True):
+                st.markdown(f"#### {info.get('pack', 'Pack')}")
 
-            # Show compact metric boxes for short values, and full-width text for long notes.
-            hidden_cols = {"pack"}
-            long_text_cols = {"notes", "description", "summary", "datasheet_notes", "capabilities"}
+                hidden_cols = {"pack"}
+                long_text_cols = {"notes", "description", "summary", "datasheet_notes", "capabilities"}
 
-            metric_items = []
-            text_items = []
+                metric_items = []
+                text_items = []
 
-            for col in pack_info_df.columns:
-                if col in hidden_cols:
-                    continue
+                for col in pack_info_df.columns:
+                    if col in hidden_cols:
+                        continue
 
-                value = info.get(col)
-                if pd.isna(value):
-                    continue
+                    value = info.get(col)
+                    if pd.isna(value):
+                        continue
 
-                label = str(col).replace("_", " ").title()
-                value_text_display = str(value)
+                    label = str(col).replace("_", " ").title()
+                    value_text_display = str(value)
 
-                if col.lower() in long_text_cols or len(value_text_display) > 80:
-                    text_items.append((label, value_text_display))
-                else:
-                    metric_items.append((label, value_text_display))
+                    if col.lower() in long_text_cols or len(value_text_display) > 80:
+                        text_items.append((label, value_text_display))
+                    else:
+                        metric_items.append((label, value_text_display))
 
-            if metric_items:
-                cols = st.columns(min(4, len(metric_items)))
-                for i, (label, value) in enumerate(metric_items):
-                    cols[i % len(cols)].metric(label, value)
+                if metric_items:
+                    cols = st.columns(min(4, len(metric_items)))
+                    for i, (label, value) in enumerate(metric_items):
+                        cols[i % len(cols)].metric(label, value)
 
-            for label, value in text_items:
-                st.markdown(f"**{label}:** {value}")
+                for label, value in text_items:
+                    st.markdown(f"**{label}:** {value}")
 
-meta_bits = []
-first_row = selected_rows.iloc[0]
-for col in ["cell", "chemistry", "series", "parallel"]:
-    if col in selected_rows.columns and pd.notna(first_row.get(col)):
-        meta_bits.append(f"**{col.title()}:** {first_row.get(col)}")
-if meta_bits:
-    st.markdown("  |  ".join(meta_bits))
+# Compact metadata from pack_index.csv, grouped per selected pack.
+for pack_name in selected_packs:
+    pack_meta_rows = selected_rows[selected_rows["pack"].astype(str) == str(pack_name)]
+    if pack_meta_rows.empty:
+        continue
+
+    first_row = pack_meta_rows.iloc[0]
+    meta_bits = []
+    for col in ["cell", "chemistry", "series", "parallel"]:
+        if col in selected_rows.columns and pd.notna(first_row.get(col)):
+            meta_bits.append(f"**{col.title()}:** {first_row.get(col)}")
+
+    if meta_bits:
+        st.markdown(f"**{pack_name}:** " + "  |  ".join(meta_bits))
 
 notes = selected_rows["notes"].dropna().unique().tolist() if "notes" in selected_rows.columns else []
 if notes:
@@ -420,7 +447,7 @@ if show_summary:
 
     for row, df in loaded:
         with st.container(border=True):
-            st.markdown(f"#### {row['test']}")
+            st.markdown(f"#### {row.get('pack', '')} — {row['test']}")
 
             # Optional small details under each run title
             details = []
@@ -452,7 +479,7 @@ for row, df in loaded:
     if smooth:
         y = smooth_series(y)
 
-    label = str(row["test"])
+    label = f"{row.get('pack', 'Pack')} — {row['test']}"
     if "current_a" in row and pd.notna(row["current_a"]):
         label = f"{label} ({row['current_a']}A)"
 
@@ -480,7 +507,7 @@ else:
     }
 
     fig.update_layout(
-        title=f"{pack} — {graph_type}",
+        title=f"{pack_title} — {graph_type}",
         height=int(chart_height),
         template="plotly_white",
         hovermode="x unified",
@@ -501,7 +528,7 @@ with st.expander("Download raw test files"):
             path = DATA_DIR / str(row["file"])
         if path.exists():
             st.download_button(
-                label=f"Download {row['test']} CSV",
+                label=f"Download {row.get('pack', 'Pack')} — {row['test']} CSV",
                 data=path.read_bytes(),
                 file_name=path.name,
                 mime="text/csv",
