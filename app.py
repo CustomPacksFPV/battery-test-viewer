@@ -29,25 +29,39 @@ PACK_INFO_FILE = DATA_DIR / "pack_info.csv"
 
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 
-st.title(APP_TITLE)
-st.caption("Verified discharge test results for available battery packs.")
+st.markdown("""
+<div style="display:flex; justify-content:space-between; align-items:flex-start;">
 
-col1, col2 = st.columns([4, 1])
+<div>
+<h1>Battery Pack Test Results</h1>
+<p style="opacity:0.7;">
+Verified discharge test results for available battery packs.
+</p>
+</div>
 
-with col2:
-    st.info("""
-**Test Notes**
+<div style="
+width:320px;
+background:#1e3a5f;
+padding:15px;
+border-radius:10px;
+font-size:0.85rem;
+margin-left:20px;
+">
 
-• Results are from individual sample packs and may vary slightly between packs.
+<b>Test Notes</b><br><br>
 
-• Capacity, voltage sag and temperature depend on ambient temperature, cooling airflow and discharge profile.
+• Results are from individual sample packs and may vary slightly between packs.<br><br>
 
-• All tests are done without airflow, so in real world use the packs will typically run much cooler and for longer at higher currents.
+• Capacity, voltage sag and temperature depend on ambient temperature and cooling airflow.<br><br>
 
-• Tests are performed using constant-current discharge and should be used for comparison purposes.
+• Tests are performed using constant-current discharge.<br><br>
 
-• Cells are discharged to 2.5V per cell, or until the cell temperature limit.
-""")
+• Cells are discharged to 2.5V per cell or temperature limit.
+
+</div>
+
+</div>
+""", unsafe_allow_html=True)
 
 # ----------------------------
 # CSV loader: supports your logger format + ATORCH exports
