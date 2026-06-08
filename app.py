@@ -1,0 +1,435 @@
+import io
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+from scipy.signal import savgol_filter
+
+# ------------------------------------------------------------
+# Public Battery Test Viewer
+# Folder layout:
+#   app.py
+#   requirements.txt
+#   data/
+#     pack_index.csv
+#     your_test_files.csv
+#
+# pack_index.csv columns:
+#   pack,test,current_a,file,chemistry,series,parallel,cell,notes
+# Required: pack,test,file
+# Optional: current_a,chemistry,series,parallel,cell,notes
+# ------------------------------------------------------------
+
+APP_TITLE = "Battery Pack Test Results"
+DATA_DIR = Path("data")
+INDEX_FILE = DATA_DIR / "pack_index.csv"
+
+st.set_page_config(page_title=APP_TITLE, layout="wide")
+st.title(APP_TITLE)
+st.caption("Verified discharge test results for available battery packs.")
+
+
+# ----------------------------
+# CSV loader: supports your logger format + ATORCH exports
+# ----------------------------
+def read_test_csv(file_bytes: bytes) -> pd.DataFrame:
+    text = file_bytes.decode("utf-8", errors="replace")
+    lines = text.splitlines()
+    first_nonempty = next((ln for ln in lines if ln.strip()), "").strip().lower()
+
+    keep = [
+        "Voltage(V)",
+        "Current(A)",
+        "Power(W)",
+        "mAh",
+        "Wh",
+        "mAh_calc",
+        "Wh_calc",
+        "Temperature(C)",
+        "RestingVoltage(V)",
+    ]
+
+    # New logger CSV
+    if first_nonempty.startswith("t_s,") or "iso_time" in first_nonempty:
+        df = pd.read_csv(io.StringIO(text))
+        df = df.loc[:, ~df.columns.astype(str).str.startswith("Unnamed")]
+
+        if "iso_time" in df.columns:
+            df["Time"] = pd.to_datetime(df["iso_time"], errors="coerce")
+        elif "t_s" in df.columns:
+            start = pd.Timestamp("2000-01-01")
+            df["Time"] = start + pd.to_timedelta(pd.to_numeric(df["t_s"], errors="coerce"), unit="s")
+        else:
+            raise ValueError("CSV missing iso_time or t_s column.")
+
+        mapping = {
+            "voltage_v": "Voltage(V)",
+            "current_a": "Current(A)",
+            "power_w": "Power(W)",
+            "mAh": "mAh",
+            "Wh": "Wh",
+            "mAh_calc": "mAh_calc",
+            "Wh_calc": "Wh_calc",
+            "temp_c": "Temperature(C)",
+            "resting_voltage_v": "RestingVoltage(V)",
+        }
+        for src, dst in mapping.items():
+            if src in df.columns:
+                df[dst] = pd.to_numeric(df[src], errors="coerce")
+
+        out = df[["Time"] + [c for c in keep if c in df.columns]].copy()
+        return out.dropna(subset=["Time"]).sort_values("Time")
+
+    # Old ATORCH format
+    header_idx = None
+    header_line = ""
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if s.startswith("Time,") or s.startswith("Time\t"):
+            header_idx = i
+            header_line = s
+            break
+        if s.startswith("(时间)DATE,") or s.startswith("DATE,") or "(时间)DATE" in s:
+            header_idx = i
+            header_line = s
+            break
+
+    if header_idx is None:
+        raise ValueError("Could not find a supported CSV header.")
+
+    csv_text = "\n".join(lines[header_idx:])
+    sep = "," if "," in header_line else "\t"
+    df = pd.read_csv(io.StringIO(csv_text), sep=sep)
+    df = df.loc[:, ~df.columns.astype(str).str.startswith("Unnamed")]
+
+    time_col = None
+    for cand in ["Time", "(时间)DATE", "DATE", "Date", "date"]:
+        if cand in df.columns:
+            time_col = cand
+            break
+    if time_col is None:
+        time_col = df.columns[0]
+
+    df["Time"] = pd.to_datetime(df[time_col], format="%Y-%m-%d_%H:%M:%S", errors="coerce")
+    if df["Time"].isna().all():
+        df["Time"] = pd.to_datetime(df[time_col], errors="coerce")
+
+    old_map = {
+        "Voltage": "Voltage(V)",
+        "Current": "Current(A)",
+        "Power": "Power(W)",
+        "Temperature": "Temperature(C)",
+        "Temp": "Temperature(C)",
+        "RestingVoltage": "RestingVoltage(V)",
+        "(电压)VOLTAGE(V)": "Voltage(V)",
+        "(电流)CURRENT(A)": "Current(A)",
+        "(功率)POWER(W)": "Power(W)",
+        "(容量)E_CAPACITY(mAh)": "mAh",
+        "(电量)E_QUANTITY(Wh)": "Wh",
+        "(探头温度)NTC_TEMP(℃)": "Temperature(C)",
+    }
+    for src, dst in old_map.items():
+        if src in df.columns and dst not in df.columns:
+            df[dst] = pd.to_numeric(df[src], errors="coerce")
+
+    if "Current(A)" in df.columns:
+        cur = pd.to_numeric(df["Current(A)"], errors="coerce")
+        if np.nanmedian(cur) < 0:
+            df["Current(A)"] = -cur
+
+    out = df[["Time"] + [c for c in keep if c in df.columns]].copy()
+    return out.dropna(subset=["Time"]).sort_values("Time")
+
+
+def fmt_runtime(seconds: float) -> str:
+    seconds = max(0, int(round(seconds)))
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+def smooth_series(series: pd.Series, window: int = 21, poly: int = 3) -> pd.Series:
+    s = pd.to_numeric(series, errors="coerce").ffill().bfill()
+    n = len(s)
+    if n < 7:
+        return s
+    w = window if window % 2 else window + 1
+    if w > n:
+        w = n if n % 2 else n - 1
+    w = max(w, 5)
+    p = min(poly, w - 1)
+    return pd.Series(savgol_filter(s.to_numpy(), w, p, mode="interp"), index=series.index)
+
+
+def elapsed_seconds(df: pd.DataFrame) -> np.ndarray:
+    return (df["Time"] - df["Time"].iloc[0]).dt.total_seconds().to_numpy(dtype=float)
+
+
+@st.cache_data(show_spinner=False)
+def load_index() -> pd.DataFrame:
+    if not INDEX_FILE.exists():
+        return pd.DataFrame()
+    idx = pd.read_csv(INDEX_FILE)
+    required = {"pack", "test", "file"}
+    missing = required - set(idx.columns)
+    if missing:
+        raise ValueError(f"pack_index.csv is missing columns: {', '.join(sorted(missing))}")
+    return idx
+
+
+@st.cache_data(show_spinner=False)
+def load_test_file(relative_file: str) -> pd.DataFrame:
+    path = Path(relative_file)
+    if not path.is_absolute():
+        path = Path(relative_file)
+    if not path.exists():
+        # Allow paths listed as just filename in pack_index.csv
+        fallback = DATA_DIR / relative_file
+        if fallback.exists():
+            path = fallback
+    with open(path, "rb") as f:
+        return read_test_csv(f.read())
+
+
+def summarize(df: pd.DataFrame) -> dict:
+    secs = elapsed_seconds(df)
+    summary = {"Runtime": fmt_runtime(float(np.nanmax(secs))) if len(secs) else "—"}
+
+    if "mAh_calc" in df.columns and df["mAh_calc"].notna().any():
+        summary["Delivered mAh"] = float(pd.to_numeric(df["mAh_calc"], errors="coerce").max())
+    elif "mAh" in df.columns and df["mAh"].notna().any():
+        summary["Delivered mAh"] = float(pd.to_numeric(df["mAh"], errors="coerce").max())
+
+    if "Wh_calc" in df.columns and df["Wh_calc"].notna().any():
+        summary["Delivered Wh"] = float(pd.to_numeric(df["Wh_calc"], errors="coerce").max())
+    elif "Wh" in df.columns and df["Wh"].notna().any():
+        summary["Delivered Wh"] = float(pd.to_numeric(df["Wh"], errors="coerce").max())
+
+    if "Voltage(V)" in df.columns:
+        v = pd.to_numeric(df["Voltage(V)"], errors="coerce")
+        summary["Min voltage"] = float(v.min())
+        summary["Start voltage"] = float(v.iloc[0])
+
+    if "Temperature(C)" in df.columns:
+        t = pd.to_numeric(df["Temperature(C)"], errors="coerce")
+        summary["Max temp"] = float(t.max())
+
+    if "Current(A)" in df.columns:
+        c = pd.to_numeric(df["Current(A)"], errors="coerce")
+        summary["Avg current"] = float(c.mean())
+
+    return summary
+
+
+def value_text(key: str, value) -> str:
+    if value == "—" or pd.isna(value):
+        return "—"
+    if key == "Runtime":
+        return str(value)
+    if key == "Delivered mAh":
+        return f"{value:.0f} mAh"
+    if key == "Delivered Wh":
+        return f"{value:.2f} Wh"
+    if key in ["Min voltage", "Start voltage"]:
+        return f"{value:.2f} V"
+    if key == "Max temp":
+        return f"{value:.1f} °C"
+    if key == "Avg current":
+        return f"{value:.1f} A"
+    return str(value)
+
+
+try:
+    index_df = load_index()
+except Exception as e:
+    st.error(str(e))
+    st.stop()
+
+if index_df.empty:
+    st.warning("No data found. Create data/pack_index.csv and add your test CSVs to the data folder.")
+    st.code(
+        """pack,test,current_a,file,cell,notes
+JP30 6S1P,20A run,20,data/JP30_6S1P_20A.csv,Ampace JP30,Room temp test
+JP30 6S1P,50A run,50,data/JP30_6S1P_50A.csv,Ampace JP30,High current test""",
+        language="csv",
+    )
+    st.stop()
+
+# ----------------------------
+# Sidebar controls
+# ----------------------------
+with st.sidebar:
+    st.header("Select results")
+
+    packs = sorted(index_df["pack"].dropna().unique().tolist())
+    pack = st.selectbox("Battery pack", packs)
+
+    pack_rows = index_df[index_df["pack"] == pack].copy()
+    tests = pack_rows["test"].dropna().tolist()
+    selected_tests = st.multiselect("Tests", tests, default=tests[: min(3, len(tests))])
+
+    graph_options = {
+        "Voltage": "Voltage(V)",
+        "Temperature": "Temperature(C)",
+        "Power": "Power(W)",
+        "Current": "Current(A)",
+        "Capacity": "mAh_calc",
+        "Energy": "Wh_calc",
+    }
+    graph_type = st.selectbox("Graph", list(graph_options.keys()))
+
+    st.header("Display")
+    # Smoothing removed for public viewer: show the real measured data by default.
+    smooth = False
+    show_markers = st.checkbox("Show points", value=False)
+    show_summary = st.checkbox("Show summary cards", value=True)
+    line_width = st.slider("Line width", 1.0, 5.0, 2.6, 0.1)
+    chart_height = st.slider("Chart height", 450, 900, 650, 25)
+
+if not selected_tests:
+    st.info("Select at least one test.")
+    st.stop()
+
+selected_rows = pack_rows[pack_rows["test"].isin(selected_tests)]
+
+# ----------------------------
+# Load selected tests
+# ----------------------------
+loaded = []
+errors = []
+for _, row in selected_rows.iterrows():
+    try:
+        df = load_test_file(str(row["file"]))
+        loaded.append((row, df))
+    except Exception as e:
+        errors.append(f"{row.get('test', 'Unknown test')}: {e}")
+
+if errors:
+    st.error("Some tests failed to load:\n\n" + "\n".join(errors))
+
+if not loaded:
+    st.stop()
+
+# Prefer calculated columns but fall back to raw logged columns
+selected_col = graph_options[graph_type]
+if selected_col == "mAh_calc":
+    fallback_col = "mAh"
+elif selected_col == "Wh_calc":
+    fallback_col = "Wh"
+else:
+    fallback_col = selected_col
+
+# ----------------------------
+# Pack info
+# ----------------------------
+st.subheader(pack)
+
+meta_bits = []
+first_row = selected_rows.iloc[0]
+for col in ["cell", "chemistry", "series", "parallel"]:
+    if col in selected_rows.columns and pd.notna(first_row.get(col)):
+        meta_bits.append(f"**{col.title()}:** {first_row.get(col)}")
+if meta_bits:
+    st.markdown("  |  ".join(meta_bits))
+
+notes = selected_rows["notes"].dropna().unique().tolist() if "notes" in selected_rows.columns else []
+if notes:
+    with st.expander("Test notes"):
+        for note in notes:
+            st.write(f"- {note}")
+
+# ----------------------------
+# Summary cards
+# ----------------------------
+if show_summary:
+    st.markdown("### Test summaries")
+    card_order = ["Delivered mAh", "Delivered Wh", "Runtime", "Max temp", "Min voltage", "Avg current"]
+
+    for row, df in loaded:
+        with st.container(border=True):
+            st.markdown(f"#### {row['test']}")
+
+            # Optional small details under each run title
+            details = []
+            if "current_a" in row and pd.notna(row.get("current_a")):
+                details.append(f"**Current:** {row.get('current_a')}A")
+            if "notes" in row and pd.notna(row.get("notes")):
+                details.append(f"**Notes:** {row.get('notes')}")
+            if details:
+                st.caption("  |  ".join(details))
+
+            s = summarize(df)
+            cols = st.columns(len(card_order))
+            for c, key in zip(cols, card_order):
+                c.metric(key, value_text(key, s.get(key, "—")))
+
+# ----------------------------
+# Graph
+# ----------------------------
+fig = go.Figure()
+mode = "lines+markers" if show_markers else "lines"
+
+for row, df in loaded:
+    col = selected_col if selected_col in df.columns else fallback_col
+    if col not in df.columns:
+        continue
+
+    x = elapsed_seconds(df) / 60.0
+    y = pd.to_numeric(df[col], errors="coerce")
+    if smooth:
+        y = smooth_series(y)
+
+    label = str(row["test"])
+    if "current_a" in row and pd.notna(row["current_a"]):
+        label = f"{label} ({row['current_a']}A)"
+
+    fig.add_trace(
+        go.Scatter(
+            x=x,
+            y=y,
+            mode=mode,
+            name=label,
+            line=dict(width=float(line_width)),
+            hovertemplate=f"{label}<br>Time: %{{x:.2f}} min<br>{graph_type}: %{{y:.3f}}<extra></extra>",
+        )
+    )
+
+if not fig.data:
+    st.warning(f"No selected files contain data for: {graph_type}")
+else:
+    y_titles = {
+        "Voltage": "Voltage (V)",
+        "Temperature": "Temperature (°C)",
+        "Power": "Power (W)",
+        "Current": "Current (A)",
+        "Capacity": "Capacity (mAh)",
+        "Energy": "Energy (Wh)",
+    }
+
+    fig.update_layout(
+        title=f"{pack} — {graph_type}",
+        height=int(chart_height),
+        template="plotly_white",
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        margin=dict(l=70, r=30, t=90, b=70),
+        xaxis=dict(title="Elapsed time (minutes)", showgrid=True),
+        yaxis=dict(title=y_titles.get(graph_type, graph_type), showgrid=True),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+# ----------------------------
+# Raw data download
+# ----------------------------
+with st.expander("Download raw test files"):
+    for row, _df in loaded:
+        path = Path(str(row["file"]))
+        if not path.exists():
+            path = DATA_DIR / str(row["file"])
+        if path.exists():
+            st.download_button(
+                label=f"Download {row['test']} CSV",
+                data=path.read_bytes(),
+                file_name=path.name,
+                mime="text/csv",
+            )
