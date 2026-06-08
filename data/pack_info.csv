@@ -2,3 +2,4 @@ pack,cell,capacity_mAh,weight_g,continuous_a,burst_a,energy_wh,notes
 JP30 6S1P,Ampace JP30,3000,325,36,140,64.8,
 JP40 6S1P,Ampace JP40,4000,450,40,140,86.4,
 50XG 6S1P,Tenpower 50XG,5000,465,40,140,108,
+60P 6S1P,Linkdata 60P,6000,470,30,110,130,
