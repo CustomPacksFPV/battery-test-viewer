@@ -546,9 +546,9 @@ if show_summary:
     for row, df in loaded:
         row_colour = trace_colors.get(trace_key(row), "#636EFA")
         s = summarize(df)
-
-      subtitle = ""
-
+        
+        subtitle = ""
+        
         metrics = [(key, value_text(key, s.get(key, "—"))) for key in card_order]
 
         st.markdown(
