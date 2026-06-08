@@ -30,6 +30,18 @@ st.set_page_config(page_title=APP_TITLE, layout="wide")
 st.title(APP_TITLE)
 st.caption("Verified discharge test results for available battery packs.")
 
+st.info("""
+**Test Notes**
+
+• Results are from individual sample packs and may vary slightly between packs.
+
+• Capacity, voltage sag and temperature depend on ambient temperature, cooling airflow and discharge profile.
+
+• Tests are performed using constant-current discharge and should be used for comparison purposes.
+
+• Cells are discharged to approximately 2.5V per cell unless otherwise stated.
+""")
+
 # ----------------------------
 # CSV loader: supports your logger format + ATORCH exports
 # ----------------------------
