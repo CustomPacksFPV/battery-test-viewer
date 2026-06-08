@@ -302,33 +302,30 @@ def html_escape(value) -> str:
 def metric_card_html(title: str, subtitle: str, metrics: list[tuple[str, str]], color: str) -> str:
     metric_blocks = ""
     for label, value in metrics:
-        metric_blocks += f"""
-        <div>
-            <div style="font-size: 0.78rem; opacity: 0.72; font-weight: 600;">{html_escape(label)}</div>
-            <div style="font-size: 1.65rem; line-height: 1.25; margin-top: 0.15rem;">{html_escape(value)}</div>
-        </div>
-        """
+        metric_blocks += (
+            f'<div>'
+            f'<div style="font-size: 0.78rem; opacity: 0.72; font-weight: 600;">{html_escape(label)}</div>'
+            f'<div style="font-size: 1.65rem; line-height: 1.25; margin-top: 0.15rem;">{html_escape(value)}</div>'
+            f'</div>'
+        )
 
-    return f"""
-    <div style="
-        border: 1px solid rgba(255,255,255,0.14);
-        border-left: 7px solid {color};
-        border-radius: 10px;
-        padding: 18px 18px 16px 18px;
-        margin: 0 0 14px 0;
-        background: linear-gradient(90deg, {color_to_rgba(color, 0.11)}, rgba(255,255,255,0.018) 34%);
-    ">
-        <div style="font-size: 1.15rem; font-weight: 750; margin-bottom: 0.35rem;">{html_escape(title)}</div>
-        <div style="font-size: 0.82rem; opacity: 0.75; margin-bottom: 1.1rem;">{html_escape(subtitle)}</div>
-        <div style="
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
-            gap: 1.15rem 2rem;
-        ">
-            {metric_blocks}
-        </div>
-    </div>
-    """
+    # Keep the HTML left-aligned. Leading indentation can make Streamlit render it as a code block.
+    return (
+        f'<div style="'
+        f'border: 1px solid rgba(255,255,255,0.14); '
+        f'border-left: 7px solid {color}; '
+        f'border-radius: 10px; '
+        f'padding: 18px 18px 16px 18px; '
+        f'margin: 0 0 14px 0; '
+        f'background: linear-gradient(90deg, {color_to_rgba(color, 0.11)}, rgba(255,255,255,0.018) 34%);'
+        f'">'
+        f'<div style="font-size: 1.15rem; font-weight: 750; margin-bottom: 0.35rem;">{html_escape(title)}</div>'
+        f'<div style="font-size: 0.82rem; opacity: 0.75; margin-bottom: 1.1rem;">{html_escape(subtitle)}</div>'
+        f'<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 1.15rem 2rem;">'
+        f'{metric_blocks}'
+        f'</div>'
+        f'</div>'
+    )
 
 
 try:
@@ -513,16 +510,8 @@ if not pack_info_df.empty:
 
             for label, value in text_items:
                 st.markdown(
-                    f"""
-                    <div style="
-                        border-left: 7px solid {pack_colour};
-                        padding: 0.15rem 0 0.45rem 1rem;
-                        margin: -0.45rem 0 0.85rem 0;
-                        opacity: 0.95;
-                    ">
-                        <b>{html_escape(label)}:</b> {html_escape(value)}
-                    </div>
-                    """,
+                    f'<div style="border-left: 7px solid {pack_colour}; padding: 0.15rem 0 0.45rem 1rem; margin: -0.45rem 0 0.85rem 0; opacity: 0.95;">'
+                    f'<b>{html_escape(label)}:</b> {html_escape(value)}</div>',
                     unsafe_allow_html=True,
                 )
 
