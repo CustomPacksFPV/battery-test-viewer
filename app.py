@@ -29,9 +29,15 @@ PACK_INFO_FILE = DATA_DIR / "pack_info.csv"
 
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 st.title(APP_TITLE)
-st.caption("Verified discharge test results for available battery packs.")
 
-st.info("""
+col1, col2 = st.columns([4, 1])
+
+with col1:
+    st.caption("Verified discharge test results for available battery packs.")
+
+with col2:
+    with st.expander("About These Tests"):
+        st.markdown("""
 **Test Notes**
 
 • Results are from individual sample packs and may vary slightly between packs.
