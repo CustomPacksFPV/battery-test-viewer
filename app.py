@@ -547,12 +547,7 @@ if show_summary:
         row_colour = trace_colors.get(trace_key(row), "#636EFA")
         s = summarize(df)
 
-        details = []
-        if "current_a" in row and pd.notna(row.get("current_a")):
-            details.append(f"Current: {row.get('current_a')}A")
-        if "notes" in row and pd.notna(row.get("notes")):
-            details.append(f"Notes: {row.get('notes')}")
-        subtitle = "  |  ".join(details) if details else "Test result"
+      subtitle = ""
 
         metrics = [(key, value_text(key, s.get(key, "—"))) for key in card_order]
 
