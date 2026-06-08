@@ -1,0 +1,4 @@
+pack,cell,capacity_mAh,weight_g,continuous_a,burst_a,energy_wh,notes
+JP30 6S1P,Ampace JP30,3000,320,36,140,64.8,High power 18650 cell
+JP40 6S1P,Ampace JP40,4000,440,40,140,86.4,High power 21700 cell
+50XG 6S1P,Tenpower 50XG,5000,470,40,140,108,High energy 21700 cell
