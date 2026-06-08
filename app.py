@@ -264,6 +264,70 @@ def value_text(key: str, value) -> str:
     return str(value)
 
 
+PLOT_COLORS = [
+    "#636EFA", "#EF553B", "#00CC96", "#AB63FA", "#FFA15A",
+    "#19D3F3", "#FF6692", "#B6E880", "#FF97FF", "#FECB52",
+]
+
+
+def trace_key(row) -> tuple[str, str]:
+    return (str(row.get("pack", "Pack")), str(row.get("test", "Test")))
+
+
+def build_trace_colors(rows: pd.DataFrame) -> dict:
+    colours = {}
+    for i, (_, row) in enumerate(rows.reset_index(drop=True).iterrows()):
+        colours[trace_key(row)] = PLOT_COLORS[i % len(PLOT_COLORS)]
+    return colours
+
+
+def color_to_rgba(hex_color: str, alpha: float = 0.08) -> str:
+    hc = str(hex_color).lstrip("#")
+    if len(hc) != 6:
+        return f"rgba(255,255,255,{alpha})"
+    r, g, b = int(hc[0:2], 16), int(hc[2:4], 16), int(hc[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+def html_escape(value) -> str:
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def metric_card_html(title: str, subtitle: str, metrics: list[tuple[str, str]], color: str) -> str:
+    metric_blocks = ""
+    for label, value in metrics:
+        metric_blocks += (
+            f'<div>'
+            f'<div style="font-size: 0.78rem; opacity: 0.72; font-weight: 600;">{html_escape(label)}</div>'
+            f'<div style="font-size: 1.65rem; line-height: 1.25; margin-top: 0.15rem;">{html_escape(value)}</div>'
+            f'</div>'
+        )
+
+    # Keep the HTML left-aligned. Leading indentation can make Streamlit render it as a code block.
+    return (
+        f'<div style="'
+        f'border: 1px solid rgba(255,255,255,0.14); '
+        f'border-left: 7px solid {color}; '
+        f'border-radius: 10px; '
+        f'padding: 18px 18px 16px 18px; '
+        f'margin: 0 0 14px 0; '
+        f'background: linear-gradient(90deg, {color_to_rgba(color, 0.11)}, rgba(255,255,255,0.018) 34%);'
+        f'">'
+        f'<div style="font-size: 1.15rem; font-weight: 750; margin-bottom: 0.35rem;">{html_escape(title)}</div>'
+        f'<div style="font-size: 0.82rem; opacity: 0.75; margin-bottom: 1.1rem;">{html_escape(subtitle)}</div>'
+        f'<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 1.15rem 2rem;">'
+        f'{metric_blocks}'
+        f'</div>'
+        f'</div>'
+    )
+
+
 try:
     index_df = load_index()
 except Exception as e:
@@ -319,7 +383,15 @@ with st.sidebar:
         "Capacity": "mAh_calc",
         "Energy": "Wh_calc",
     }
-    graph_type = st.selectbox("Graph", list(graph_options.keys()))
+    graph_type = st.selectbox("Primary graph", list(graph_options.keys()))
+
+    secondary_options = ["None"] + list(graph_options.keys())
+    graph_type_2 = st.selectbox(
+        "Secondary graph",
+        secondary_options,
+        index=0,
+        help="Optional second metric shown on the right axis, e.g. Temperature over Voltage.",
+    )
 
     st.header("Display")
     # Smoothing removed for public viewer: show the real measured data by default.
@@ -362,6 +434,19 @@ elif selected_col == "Wh_calc":
 else:
     fallback_col = selected_col
 
+secondary_col = None
+secondary_fallback_col = None
+if graph_type_2 != "None":
+    secondary_col = graph_options[graph_type_2]
+    if secondary_col == "mAh_calc":
+        secondary_fallback_col = "mAh"
+    elif secondary_col == "Wh_calc":
+        secondary_fallback_col = "Wh"
+    else:
+        secondary_fallback_col = secondary_col
+
+trace_colors = build_trace_colors(selected_rows)
+
 # ----------------------------
 # Pack info
 # ----------------------------
@@ -382,40 +467,53 @@ if not pack_info_df.empty:
     if not matching_info.empty:
         st.markdown("### Pack / Cell Specifications")
 
-        # Show one bordered spec box per selected pack so comparisons stay readable.
+        # Show one colour-coded spec box per selected pack so comparisons stay readable.
         for _, info in matching_info.iterrows():
-            with st.container(border=True):
-                st.markdown(f"#### {info.get('pack', 'Pack')}")
+            pack_name_for_info = str(info.get("pack", "Pack"))
+            pack_colour = next(
+                (
+                    colour for (pack_name, _test_name), colour in trace_colors.items()
+                    if pack_name == pack_name_for_info
+                ),
+                "#636EFA",
+            )
 
-                hidden_cols = {"pack"}
-                long_text_cols = {"notes", "description", "summary", "datasheet_notes", "capabilities"}
+            hidden_cols = {"pack"}
+            long_text_cols = {"notes", "description", "summary", "datasheet_notes", "capabilities"}
 
-                metric_items = []
-                text_items = []
+            metric_items = []
+            text_items = []
 
-                for col in pack_info_df.columns:
-                    if col in hidden_cols:
-                        continue
+            for col in pack_info_df.columns:
+                if col in hidden_cols:
+                    continue
 
-                    value = info.get(col)
-                    if pd.isna(value):
-                        continue
+                value = info.get(col)
+                if pd.isna(value):
+                    continue
 
-                    label = str(col).replace("_", " ").title()
-                    value_text_display = str(value)
+                label = str(col).replace("_", " ").title()
+                value_text_display = str(value)
 
-                    if col.lower() in long_text_cols or len(value_text_display) > 80:
-                        text_items.append((label, value_text_display))
-                    else:
-                        metric_items.append((label, value_text_display))
+                if col.lower() in long_text_cols or len(value_text_display) > 80:
+                    text_items.append((label, value_text_display))
+                else:
+                    metric_items.append((label, value_text_display))
 
-                if metric_items:
-                    cols = st.columns(min(4, len(metric_items)))
-                    for i, (label, value) in enumerate(metric_items):
-                        cols[i % len(cols)].metric(label, value)
+            card_html = metric_card_html(
+                title=pack_name_for_info,
+                subtitle="Pack / cell specifications",
+                metrics=metric_items,
+                color=pack_colour,
+            )
+            st.markdown(card_html, unsafe_allow_html=True)
 
-                for label, value in text_items:
-                    st.markdown(f"**{label}:** {value}")
+            for label, value in text_items:
+                st.markdown(
+                    f'<div style="border-left: 7px solid {pack_colour}; padding: 0.15rem 0 0.45rem 1rem; margin: -0.45rem 0 0.85rem 0; opacity: 0.95;">'
+                    f'<b>{html_escape(label)}:</b> {html_escape(value)}</div>',
+                    unsafe_allow_html=True,
+                )
 
 # Compact metadata from pack_index.csv, grouped per selected pack.
 for pack_name in selected_packs:
@@ -446,22 +544,27 @@ if show_summary:
     card_order = ["Delivered mAh", "Delivered Wh", "Runtime", "Max temp", "Min voltage", "Avg current"]
 
     for row, df in loaded:
-        with st.container(border=True):
-            st.markdown(f"#### {row.get('pack', '')} — {row['test']}")
+        row_colour = trace_colors.get(trace_key(row), "#636EFA")
+        s = summarize(df)
 
-            # Optional small details under each run title
-            details = []
-            if "current_a" in row and pd.notna(row.get("current_a")):
-                details.append(f"**Current:** {row.get('current_a')}A")
-            if "notes" in row and pd.notna(row.get("notes")):
-                details.append(f"**Notes:** {row.get('notes')}")
-            if details:
-                st.caption("  |  ".join(details))
+        details = []
+        if "current_a" in row and pd.notna(row.get("current_a")):
+            details.append(f"Current: {row.get('current_a')}A")
+        if "notes" in row and pd.notna(row.get("notes")):
+            details.append(f"Notes: {row.get('notes')}")
+        subtitle = "  |  ".join(details) if details else "Test result"
 
-            s = summarize(df)
-            cols = st.columns(len(card_order))
-            for c, key in zip(cols, card_order):
-                c.metric(key, value_text(key, s.get(key, "—")))
+        metrics = [(key, value_text(key, s.get(key, "—"))) for key in card_order]
+
+        st.markdown(
+            metric_card_html(
+                title=f"{row.get('pack', '')} — {row['test']}",
+                subtitle=subtitle,
+                metrics=metrics,
+                color=row_colour,
+            ),
+            unsafe_allow_html=True,
+        )
 
 # ----------------------------
 # Graph
@@ -479,20 +582,45 @@ for row, df in loaded:
     if smooth:
         y = smooth_series(y)
 
-    label = f"{row.get('pack', 'Pack')} — {row['test']}"
+    label_base = f"{row.get('pack', 'Pack')} — {row['test']}"
     if "current_a" in row and pd.notna(row["current_a"]):
-        label = f"{label} ({row['current_a']}A)"
+        label_base = f"{label_base} ({row['current_a']}A)"
+
+    row_colour = trace_colors.get(trace_key(row), "#636EFA")
 
     fig.add_trace(
         go.Scatter(
             x=x,
             y=y,
             mode=mode,
-            name=label,
-            line=dict(width=float(line_width)),
-            hovertemplate=f"{label}<br>Time: %{{x:.2f}} min<br>{graph_type}: %{{y:.3f}}<extra></extra>",
+            name=f"{label_base} — {graph_type}",
+            legendgroup=label_base,
+            line=dict(width=float(line_width), color=row_colour),
+            hovertemplate=f"{label_base}<br>Time: %{{x:.2f}} min<br>{graph_type}: %{{y:.3f}}<extra></extra>",
+            yaxis="y",
         )
     )
+
+    if secondary_col is not None:
+        col2 = secondary_col if secondary_col in df.columns else secondary_fallback_col
+        if col2 in df.columns:
+            y2 = pd.to_numeric(df[col2], errors="coerce")
+            if smooth:
+                y2 = smooth_series(y2)
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x,
+                    y=y2,
+                    mode=mode,
+                    name=f"{label_base} — {graph_type_2}",
+                    legendgroup=label_base,
+                    line=dict(width=max(1.0, float(line_width) * 0.78), color=row_colour, dash="dot"),
+                    opacity=0.75,
+                    hovertemplate=f"{label_base}<br>Time: %{{x:.2f}} min<br>{graph_type_2}: %{{y:.3f}}<extra></extra>",
+                    yaxis="y2",
+                )
+            )
 
 if not fig.data:
     st.warning(f"No selected files contain data for: {graph_type}")
@@ -506,16 +634,30 @@ else:
         "Energy": "Energy (Wh)",
     }
 
-    fig.update_layout(
-        title=f"{pack_title} — {graph_type}",
+    chart_title = f"{pack_title} — {graph_type}"
+    if graph_type_2 != "None":
+        chart_title = f"{pack_title} — {graph_type} + {graph_type_2}"
+
+    layout_kwargs = dict(
+        title=chart_title,
         height=int(chart_height),
         template="plotly_white",
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-        margin=dict(l=70, r=30, t=90, b=70),
+        margin=dict(l=70, r=70 if graph_type_2 != "None" else 30, t=90, b=70),
         xaxis=dict(title="Elapsed time (minutes)", showgrid=True),
         yaxis=dict(title=y_titles.get(graph_type, graph_type), showgrid=True),
     )
+
+    if graph_type_2 != "None":
+        layout_kwargs["yaxis2"] = dict(
+            title=y_titles.get(graph_type_2, graph_type_2),
+            overlaying="y",
+            side="right",
+            showgrid=False,
+        )
+
+    fig.update_layout(**layout_kwargs)
     st.plotly_chart(fig, use_container_width=True)
 
 # ----------------------------
