@@ -29,7 +29,7 @@ PACK_INFO_FILE = DATA_DIR / "pack_info.csv"
 
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 st.title(APP_TITLE)
-st.caption("Verified discharge test results for available battery packs.")
+st.caption("Full test results of CustomPacksFPV battery packs")
 
 st.info("""
 **Test Notes**
