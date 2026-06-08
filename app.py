@@ -642,7 +642,7 @@ else:
         legend=dict(
     orientation="h",
     yanchor="bottom",
-    y=1.10,
+    y=1.2,
     xanchor="left",
     x=0,
     font=dict(size=16)
