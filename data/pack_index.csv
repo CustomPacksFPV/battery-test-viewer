@@ -1,5 +1,6 @@
 pack,test,current_a,file
 JP30 4S1P,20A run,20,JP30 4S1P 20A_temp_corrected_59C.csv
+JP30 4S1P,50A run,50,JP30 4S1P 50A_temp_corrected_60C.csv
 JP30 6S1P,10A run,10,JP30 6S1P 10A_temp_corrected_42C.csv
 JP30 6S1P,20A run,20,JP30 6S1P 20A.csv
 JP30 6S1P,30A run,30,JP30 6S1P 30A_temp_corrected_68C.csv
