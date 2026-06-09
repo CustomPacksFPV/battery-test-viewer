@@ -38,7 +38,7 @@ st.info("""
 
 • Capacity, voltage sag and temperature depend on ambient temperature, cooling airflow and discharge profile.
 
-• All tests are done without airflow, so in real world use the packs will typically run much cooler and for longer at higher currents.
+• All tests are done without airflow, so in real world use the packs will *typically* run much cooler and for longer at higher currents.
 
 • Tests are performed using constant-current discharge and should be used for comparison purposes.
 
