@@ -22,7 +22,7 @@ from scipy.signal import savgol_filter
 # Optional: current_a,chemistry,series,parallel,cell,notes
 # ------------------------------------------------------------
 
-APP_TITLE = "Battery Pack Test Results"
+APP_TITLE = "Interactive CustomPacksFPV Battery Pack Test Results"
 DATA_DIR = Path("data")
 INDEX_FILE = DATA_DIR / "pack_index.csv"
 PACK_INFO_FILE = DATA_DIR / "pack_info.csv"
