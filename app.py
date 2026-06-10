@@ -34,13 +34,13 @@ st.caption("Full test results of CustomPacksFPV battery packs")
 st.info("""
 **Test Notes**
 
+• All tests are done with CustomPacksFPV packs, unless otherwise stated.
+
 • Results are from individual sample packs and may vary slightly between packs.
 
 • Capacity, voltage sag and temperature depend on ambient temperature, cooling airflow and discharge profile.
 
 • All tests are done without airflow, so in real world use the packs will *typically* run much cooler and for longer at higher currents.
-
-• Tests are performed using constant-current discharge and should be used for comparison purposes.
 
 • Cells are discharged to 2.5V per cell, or until the cell temperature limit.
 """)
