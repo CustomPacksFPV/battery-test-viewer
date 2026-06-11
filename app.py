@@ -36,9 +36,9 @@ st.info("""
 
 • All tests are done with CustomPacksFPV packs, unless otherwise stated.
 
-• Results are from individual sample packs and may vary slightly between packs. These results are for educational purposes and should not be taken as absolute.
+• These results are for demonstration purposes. Variables such as starting temperature were not tightly controlled, and  therefore these results should not be taken as absolute.
 
-• Cells are discharged to 2.5V per cell, or until the cell temperature limit. All tests are done without airflow.
+• Cells are discharged to 2.5V per cell, or until the cell temperature limit of 80°c (besides a few i stopped early at 60°c). All tests are done without airflow.
 """)
 
 # ----------------------------
