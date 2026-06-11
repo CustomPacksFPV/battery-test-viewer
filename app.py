@@ -39,9 +39,6 @@ st.info("""
 • Results are from individual sample packs and may vary slightly between packs. These results are for educational purposes and should not be taken as absolute.
 
 • Cells are discharged to 2.5V per cell, or until the cell temperature limit. All tests are done without airflow.
--blblbl
--vldsvdks
--gdfg
 """)
 
 # ----------------------------
