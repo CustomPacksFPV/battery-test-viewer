@@ -36,6 +36,7 @@ st.info("""
 
 • All tests are done with CustomPacksFPV packs, unless otherwise stated.
 • Results are from individual sample packs and may vary slightly between packs.
+
 • Capacity, voltage sag and temperature depend on ambient temperature, cooling airflow and discharge profile.
 • All tests are done without airflow, so in real world use the packs will *typically* run cooler and for longer at higher currents.
 • Cells are discharged to 2.5V per cell, or until the cell temperature limit.
